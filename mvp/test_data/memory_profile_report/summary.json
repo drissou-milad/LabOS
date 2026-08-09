@@ -1,0 +1,12 @@
+{
+  "sample_name": "memory_profile",
+  "n_frames": 6,
+  "n_cells_detected": 14,
+  "n_tracks": 4,
+  "n_divisions": 1,
+  "avg_lifetime": 3.5,
+  "avg_lifetime_units": "frames",
+  "avg_velocity": 3.747323912665817,
+  "avg_velocity_units": "px/frame",
+  "scores": null
+}

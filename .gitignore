@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+models/*
+!models/.gitkeep
+
+outputs/*
+!outputs/.gitkeep
+
+# Dataset
+data/
+
+# Large files
+*.zip
+*.zarr
+*.geff
+
+.vscode/
+.DS_Store
+Thumbs.db

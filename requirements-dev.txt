@@ -1,0 +1,2 @@
+pytest==8.3.3
+pypdf>=4.0.0  # test-only: used by test_report.py to verify PDF page counts; unpinned/unverified, same caveat as plotly in requirements.txt

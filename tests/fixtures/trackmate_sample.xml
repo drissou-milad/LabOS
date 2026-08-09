@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Hand-authored per TrackMate's documented XML model-export schema (Model > AllSpots >
+SpotsInFrame > Spot, Model > AllTracks > Track > Edge) — NOT exported from a real Fiji/TrackMate
+run (none is available in this environment; see src/benchmark.py's module docstring). This
+fixture exists to verify load_trackmate_xml()'s parsing logic against the schema it claims to
+implement. It is not a substitute for validating against a real exported file — do that before
+trusting a comparison table that includes a real TrackMate row (see RUNBOOK.md step 8).
+
+Encodes the same two-cell, one-division scenario as tests/test_benchmark.py's
+_synthetic_dataset(), so a real comparison run and this fixture can be reasoned about side by
+side: track 0 divides between frame 1 and frame 2 (spot 2 -> spots 4 and 5); track 1 runs
+undivided for all four frames.
+-->
+<TrackMate version="7.11.1">
+  <Model spatialunits="pixel" timeunits="frame">
+    <FeatureDeclarations>
+      <SpotFeatures>
+        <Feature feature="QUALITY" name="Quality" shortname="Quality" dimension="QUALITY" isint="false" />
+      </SpotFeatures>
+      <EdgeFeatures>
+        <Feature feature="LINK_COST" name="Link cost" shortname="Cost" dimension="NONE" isint="false" />
+      </EdgeFeatures>
+      <TrackFeatures />
+    </FeatureDeclarations>
+    <AllSpots nspots="10">
+      <SpotsInFrame frame="0">
+        <Spot ID="0" name="ID0" QUALITY="10.0" POSITION_X="10.0" POSITION_Y="10.0" POSITION_Z="0.0" POSITION_T="0.0" FRAME="0" RADIUS="5.0" />
+        <Spot ID="1" name="ID1" QUALITY="10.0" POSITION_X="40.0" POSITION_Y="40.0" POSITION_Z="0.0" POSITION_T="0.0" FRAME="0" RADIUS="5.0" />
+      </SpotsInFrame>
+      <SpotsInFrame frame="1">
+        <Spot ID="2" name="ID2" QUALITY="10.0" POSITION_X="11.0" POSITION_Y="11.0" POSITION_Z="0.0" POSITION_T="1.0" FRAME="1" RADIUS="5.0" />
+        <Spot ID="3" name="ID3" QUALITY="10.0" POSITION_X="41.0" POSITION_Y="41.0" POSITION_Z="0.0" POSITION_T="1.0" FRAME="1" RADIUS="5.0" />
+      </SpotsInFrame>
+      <SpotsInFrame frame="2">
+        <Spot ID="4" name="ID4" QUALITY="10.0" POSITION_X="12.0" POSITION_Y="12.0" POSITION_Z="0.0" POSITION_T="2.0" FRAME="2" RADIUS="5.0" />
+        <Spot ID="5" name="ID5" QUALITY="10.0" POSITION_X="20.0" POSITION_Y="20.0" POSITION_Z="0.0" POSITION_T="2.0" FRAME="2" RADIUS="5.0" />
+        <Spot ID="6" name="ID6" QUALITY="10.0" POSITION_X="42.0" POSITION_Y="42.0" POSITION_Z="0.0" POSITION_T="2.0" FRAME="2" RADIUS="5.0" />
+      </SpotsInFrame>
+      <SpotsInFrame frame="3">
+        <Spot ID="7" name="ID7" QUALITY="10.0" POSITION_X="13.0" POSITION_Y="13.0" POSITION_Z="0.0" POSITION_T="3.0" FRAME="3" RADIUS="5.0" />
+        <Spot ID="8" name="ID8" QUALITY="10.0" POSITION_X="21.0" POSITION_Y="21.0" POSITION_Z="0.0" POSITION_T="3.0" FRAME="3" RADIUS="5.0" />
+        <Spot ID="9" name="ID9" QUALITY="10.0" POSITION_X="43.0" POSITION_Y="43.0" POSITION_Z="0.0" POSITION_T="3.0" FRAME="3" RADIUS="5.0" />
+      </SpotsInFrame>
+    </AllSpots>
+    <AllTracks>
+      <Track name="Track_0" TRACK_ID="0" NUMBER_SPOTS="7" NUMBER_SPLITS="1">
+        <Edge SPOT_SOURCE_ID="0" SPOT_TARGET_ID="2" LINK_COST="1.0" />
+        <Edge SPOT_SOURCE_ID="2" SPOT_TARGET_ID="4" LINK_COST="1.0" />
+        <Edge SPOT_SOURCE_ID="2" SPOT_TARGET_ID="5" LINK_COST="1.0" />
+        <Edge SPOT_SOURCE_ID="4" SPOT_TARGET_ID="7" LINK_COST="1.0" />
+        <Edge SPOT_SOURCE_ID="5" SPOT_TARGET_ID="8" LINK_COST="1.0" />
+      </Track>
+      <Track name="Track_1" TRACK_ID="1" NUMBER_SPOTS="4" NUMBER_SPLITS="0">
+        <Edge SPOT_SOURCE_ID="1" SPOT_TARGET_ID="3" LINK_COST="1.0" />
+        <Edge SPOT_SOURCE_ID="3" SPOT_TARGET_ID="6" LINK_COST="1.0" />
+        <Edge SPOT_SOURCE_ID="6" SPOT_TARGET_ID="9" LINK_COST="1.0" />
+      </Track>
+    </AllTracks>
+    <FilteredTracks>
+      <TrackID TRACK_ID="0" />
+      <TrackID TRACK_ID="1" />
+    </FilteredTracks>
+  </Model>
+  <Settings>
+    <ImageData filename="fixture.tif" folder="." width="64" height="64" nslices="1" nframes="4" pixelwidth="1.0" pixelheight="1.0" voxeldepth="1.0" timeinterval="1.0" />
+  </Settings>
+</TrackMate>

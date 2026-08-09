@@ -1,0 +1,81 @@
+<svg viewBox="0 0 900 620" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#5b6b79"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="900" height="620" fill="#ffffff"/>
+
+  <!-- Browser -->
+  <rect x="30" y="30" width="200" height="70" rx="10" fill="#eef2f7" stroke="#8aa0b3" stroke-width="1.5"/>
+  <text x="130" y="58" text-anchor="middle" font-size="15" font-weight="600" fill="#22303c">Browser</text>
+  <text x="130" y="78" text-anchor="middle" font-size="11" fill="#5b6b79">Upload → progress → viewer → download</text>
+
+  <line x1="230" y1="65" x2="288" y2="65" stroke="#5b6b79" stroke-width="1.5" marker-end="url(#arrow2)"/>
+
+  <!-- App server -->
+  <rect x="290" y="30" width="220" height="70" rx="10" fill="#e9edf9" stroke="#7c8fd6" stroke-width="1.5"/>
+  <text x="400" y="58" text-anchor="middle" font-size="15" font-weight="600" fill="#242c5c">App Server</text>
+  <text x="400" y="78" text-anchor="middle" font-size="11" fill="#3a4585">FastAPI (or Streamlit for v0)</text>
+
+  <line x1="130" y1="100" x2="130" y2="170" stroke="#5b6b79" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <line x1="130" y1="170" x2="330" y2="170" stroke="#5b6b79" stroke-width="1.5" marker-end="url(#arrow2)" stroke-dasharray="4,3"/>
+  <text x="200" y="163" font-size="10" fill="#5b6b79">poll job status</text>
+
+  <line x1="400" y1="100" x2="400" y2="140" stroke="#5b6b79" stroke-width="1.5" marker-end="url(#arrow2)"/>
+
+  <!-- Storage -->
+  <rect x="290" y="142" width="220" height="60" rx="10" fill="#eef2f7" stroke="#8aa0b3" stroke-width="1.5"/>
+  <text x="400" y="167" text-anchor="middle" font-size="14" font-weight="600" fill="#22303c">Storage</text>
+  <text x="400" y="185" text-anchor="middle" font-size="11" fill="#5b6b79">raw upload · job status · results</text>
+
+  <line x1="400" y1="202" x2="400" y2="242" stroke="#5b6b79" stroke-width="1.5" marker-end="url(#arrow2)"/>
+
+  <!-- Job queue -->
+  <rect x="290" y="244" width="220" height="55" rx="10" fill="#faf1e3" stroke="#d3a24f" stroke-width="1.5"/>
+  <text x="400" y="267" text-anchor="middle" font-size="14" font-weight="600" fill="#5c4413">Job Queue</text>
+  <text x="400" y="285" text-anchor="middle" font-size="11" fill="#7a5c1f">v0: BackgroundTasks · later: RQ + Redis</text>
+
+  <line x1="400" y1="299" x2="400" y2="339" stroke="#5b6b79" stroke-width="1.5" marker-end="url(#arrow2)"/>
+
+  <!-- Worker -->
+  <rect x="270" y="341" width="260" height="60" rx="10" fill="#faf1e3" stroke="#d3a24f" stroke-width="1.5"/>
+  <text x="400" y="365" text-anchor="middle" font-size="14" font-weight="600" fill="#5c4413">Worker Process</text>
+  <text x="400" y="384" text-anchor="middle" font-size="11" fill="#7a5c1f">runs the pipeline below, writes results back</text>
+
+  <line x1="400" y1="401" x2="400" y2="441" stroke="#5b6b79" stroke-width="1.5" marker-end="url(#arrow2)"/>
+
+  <!-- src/ pipeline box -->
+  <rect x="230" y="443" width="440" height="150" rx="10" fill="#e6efe9" stroke="#6fa389" stroke-width="1.5"/>
+  <text x="450" y="465" text-anchor="middle" font-size="14" font-weight="600" fill="#1e3d2f">src/ — existing pipeline, unmodified</text>
+
+  <rect x="248" y="478" width="90" height="42" rx="6" fill="#ffffff" stroke="#6fa389"/>
+  <text x="293" y="502" text-anchor="middle" font-size="11" fill="#1e3d2f">CellDetector</text>
+
+  <rect x="348" y="478" width="90" height="42" rx="6" fill="#ffffff" stroke="#6fa389"/>
+  <text x="393" y="502" text-anchor="middle" font-size="11" fill="#1e3d2f">CellCNN</text>
+
+  <rect x="448" y="478" width="100" height="42" rx="6" fill="#ffffff" stroke="#6fa389"/>
+  <text x="498" y="502" text-anchor="middle" font-size="11" fill="#1e3d2f">Hungarian-Tracker</text>
+
+  <rect x="558" y="478" width="98" height="42" rx="6" fill="#ffffff" stroke="#6fa389"/>
+  <text x="607" y="495" text-anchor="middle" font-size="11" fill="#1e3d2f">Lineage-</text>
+  <text x="607" y="509" text-anchor="middle" font-size="11" fill="#1e3d2f">Builder</text>
+
+  <line x1="338" y1="499" x2="348" y2="499" stroke="#6fa389" stroke-width="1.5" marker-end="url(#arrow2)"/>
+  <line x1="438" y1="499" x2="448" y2="499" stroke="#6fa389" stroke-width="1.5" marker-end="url(#arrow2)"/>
+  <line x1="548" y1="499" x2="558" y2="499" stroke="#6fa389" stroke-width="1.5" marker-end="url(#arrow2)"/>
+
+  <text x="450" y="545" text-anchor="middle" font-size="11" fill="#3f5e4e">→ tracked cells + division events, all frames, one sample</text>
+  <text x="450" y="565" text-anchor="middle" font-size="11" fill="#3f5e4e">Same code Kaggle inference and the notebooks already use —</text>
+  <text x="450" y="580" text-anchor="middle" font-size="11" fill="#3f5e4e">this app is a new front door, not a new engine.</text>
+
+  <!-- side note: upload format -->
+  <rect x="600" y="30" width="270" height="100" rx="10" fill="#f8eaea" stroke="#c97a7a" stroke-width="1.5"/>
+  <text x="735" y="52" text-anchor="middle" font-size="13" font-weight="600" fill="#5c1f1f">⚠ Upload format problem</text>
+  <text x="615" y="72" font-size="10.5" fill="#8a3c3c">Zarr is a directory of many small</text>
+  <text x="615" y="87" font-size="10.5" fill="#8a3c3c">chunk files, not one file — awkward</text>
+  <text x="615" y="102" font-size="10.5" fill="#8a3c3c">for &lt;input type=file&gt;. MVP accepts a</text>
+  <text x="615" y="117" font-size="10.5" fill="#8a3c3c">.zip of the store (or a TIFF stack)</text>
+  <text x="615" y="132" font-size="10.5" fill="#8a3c3c" font-weight="600">and converts server-side.</text>
+</svg>

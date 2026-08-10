@@ -23,3 +23,23 @@ data/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Generated experiment artifacts
+experiments/
+
+# Generated MVP reports
+mvp/test_data/*_report/
+
+# Generated synthetic test data
+mvp/test_data/*.tif
+
+# Model artifacts
+*.pth
+*.pt
+*.npz
+
+# Databases
+*.db
+
+# Generated overlays
+ctc_overlay_*.png

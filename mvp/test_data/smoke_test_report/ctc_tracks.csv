@@ -1,5 +1,0 @@
-track_id,start_t,end_t,parent_track_id
-1,0,3,0
-2,0,5,0
-3,4,5,1
-4,4,5,1

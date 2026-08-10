@@ -43,3 +43,9 @@ mvp/test_data/*.tif
 
 # Generated overlays
 ctc_overlay_*.png
+
+# Python build/package artifacts
+*.egg-info/
+
+# Python build/package artifacts
+*.egg-info/

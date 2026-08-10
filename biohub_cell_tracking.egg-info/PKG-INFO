@@ -1,7 +1,0 @@
-Metadata-Version: 2.4
-Name: biohub-cell-tracking
-Version: 0.5.0
-Summary: 3D cell tracking pipeline for the Kaggle BioHub Cell Tracking During Development competition
-Requires-Python: >=3.10
-License-File: LICENSE
-Dynamic: license-file

@@ -49,3 +49,6 @@ ctc_overlay_*.png
 
 # Python build/package artifacts
 *.egg-info/
+
+# Local experiment outputs
+results/

@@ -1,28 +1,16 @@
-"""
-LabOS — Research Workspace (v0)
+"""LabOS — Research Workspace (v0).
 
-An AI-powered workspace for live-cell imaging research, built on the BioHub Cell Tracking
-pipeline (see src/) that started as a solution to Kaggle's BioHub - Cell Tracking During
-Development competition. LabOS is the product name; "BioHub Cell Tracking" is kept only where
-it refers to that Kaggle competition specifically (kaggle/, src/dataset.py, notebooks/) — see
-this repo's main README for the full explanation.
+An AI-powered workspace for live-cell imaging research, built on the LabOS
+cell-tracking pipeline in ``src/``.
 
-Dashboard -> My Experiments -> New Experiment (Experiment Info -> Dataset -> Configuration, per
-v0.6.0's Epic 1) -> Experiment Detail (Overview / Dataset / Configuration / Analysis History /
-Timeline / Viewer / Analytics / Lineage / Reports / Exports) -> Settings / Reports (Center),
-backed by mvp/experiments.py's six-table SQLite registry (labos.db): experiments, datasets,
-configurations, reports, events, analysis_runs.
+Dashboard → My Experiments → New Experiment → Experiment Detail, backed by
+the persistent SQLite registry in ``mvp/experiments.py``.
 
-One real limitation, stated plainly rather than hidden: the RAW UPLOADED VOLUME is not
-persisted past the session that processed it (v0 scope — see
-docs/PHASE2_MVP_ARCHITECTURE.md's storage layout). What DOES survive a restart, because it's
-reconstructed from tracks.csv via mvp/experiments.load_lineage_result(): the lineage tree (with
-descendant highlighting), all analytics, and every file in Reports/Exports, plus every
-Analysis History run and Timeline event (those are DB rows, not derived from the in-memory
-volume). What does NOT survive a restart: the live per-frame Plotly viewer with hover tooltips
-(it needs the actual image data) — that view falls back to the static frame images already
-rendered into results/frames/ at processing time, which DO persist — and Analysis History's
-"Re-run Analysis" button, for the same reason (it needs the actual pixel data to re-detect).
+The raw uploaded volume is held in memory for the active session and is not
+persisted across a server restart. Persisted results include lineage,
+analytics, reports/exports, analysis history, timeline events, and rendered
+static result frames. The interactive viewer and Re-run Analysis require
+the raw volume to still be available in the current session.
 
 Run with:
     streamlit run mvp/streamlit_app.py
@@ -57,6 +45,16 @@ if "pending_dataset" not in st.session_state:
     st.session_state.pending_dataset = None  # {dataset_id}, set once step 2 (Dataset) is done
 if "experiment_info" not in st.session_state:
     st.session_state.experiment_info = None  # {name, researcher}, set once step 1 is done
+if "_volume_cache" not in st.session_state:
+    # Raw volumes for datasets awaiting a Run Analysis decision, keyed by dataset_id — small,
+    # in-memory, cleared (via .pop()) once the experiment is created. Must be session_state,
+    # not a plain module-level dict: Streamlit reruns this whole script top-to-bottom on every
+    # interaction, so a plain `_VOLUME_CACHE = {}` at module level is reset on every single
+    # rerun — including the rerun between "cache the volume" (step 2) and "read it back"
+    # (step 3's Run Analysis button), which silently turned every analysis into
+    # process_job(experiment_id, None). Not part of mvp/experiments.py's persistence story on
+    # purpose: this is transient wizard state, not a first-class persisted object.
+    st.session_state._volume_cache = {}
 
 
 def _go(page, experiment_id=None):
@@ -326,15 +324,12 @@ def _render_new_step2_dataset():
             filename, shape=list(volume.shape), storage_path=str(temp_dataset_dir / filename)
         )
 
-        st.session_state.pending_dataset = {"dataset_id": dataset_id}
-        _VOLUME_CACHE[dataset_id] = volume
+        st.session_state.pending_dataset = {
+            "dataset_id": dataset_id,
+            "is_example": chosen_example is not None,
+        }
+        st.session_state._volume_cache[dataset_id] = volume
         st.rerun()
-
-
-# Raw volumes for datasets awaiting a Run Analysis decision — small, in-memory, cleared once
-# the experiment is created. Not part of mvp/experiments.py's persistence story on purpose:
-# this is transient wizard state, not a first-class persisted object.
-_VOLUME_CACHE = {}
 
 
 def _render_new_step3_configuration():
@@ -385,7 +380,7 @@ def _render_new_step3_configuration():
 
         # Move the dataset's raw file into the experiment's own folder (it was staged under
         # storage/_pending/ during step 2, before an experiment existed to own it).
-        volume = _VOLUME_CACHE.pop(pending["dataset_id"], None)
+        volume = st.session_state._volume_cache.pop(pending["dataset_id"], None)
         raw_dir = experiments.raw_dir(experiment_id)
         raw_dir.mkdir(parents=True, exist_ok=True)
 
@@ -393,7 +388,19 @@ def _render_new_step3_configuration():
         (STORAGE_DIR / experiment_id / "status.json").write_text(
             json.dumps({"state": "queued", "message": ""})
         )
-        thread = threading.Thread(target=process_job, args=(experiment_id, volume), daemon=True)
+        is_example = st.session_state.get("pending_dataset", {}).get("is_example", False)
+
+        volume = cached["volume"]
+
+        thread = threading.Thread(
+           target=process_job,
+           args=(experiment_id, volume),
+           kwargs={
+               "use_cnn_filter": True,
+               "config_id": new_config_id,
+          },
+          daemon=True,
+        )
         thread.start()
 
         _reset_new_experiment_wizard()
@@ -577,7 +584,7 @@ def render_detail():
             st.write(f"**Filename:** {dataset['filename']}")
             if dataset.get("shape"):
                 st.write(f"**Shape (T, Z, Y, X):** {tuple(dataset['shape'])}")
-            st.write(f"**Uploaded:** {format_relative_time(dataset['created_at'])}")
+            st.write(f"**Uploaded:** {format_relative_time(dataset['uploaded_at'])}")
             st.caption(
                 "This dataset is a first-class record, independent of this one experiment — "
                 "see LabOS_Product_Spec_v1.md — but starting a second experiment from the same "
@@ -643,9 +650,14 @@ def render_detail():
                 new_config_id = None if choice == options[0] else saved_configs[options.index(choice) - 1]["id"]
                 experiments.update_experiment(experiment_id, status="queued")
                 (STORAGE_DIR / experiment_id / "status.json").write_text(json.dumps({"state": "queued", "message": ""}))
+                
+                is_example = st.session_state.get("pending_dataset", {}).get("is_example", False)
+
                 thread = threading.Thread(
-                    target=process_job, args=(experiment_id, cached["volume"]),
-                    kwargs={"config_id": new_config_id}, daemon=True,
+                    target=process_job,
+                    args=(experiment_id, volume),
+                    kwargs={"use_cnn_filter": not is_example},
+                    daemon=True,
                 )
                 thread.start()
                 st.rerun()

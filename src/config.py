@@ -27,9 +27,9 @@ LOG_FILE = OUTPUT_PATH / "training.log"
 # --------------------------------------------------------------------------
 # Detection (used by src/detector.py)
 # --------------------------------------------------------------------------
-DETECTION_THRESHOLD = 4  # peak_local_max threshold_abs
+DETECTION_THRESHOLD = 10 # peak_local_max threshold_abs
 GAUSSIAN_SIGMA = 2
-CELL_RADIUS = 16              # peak_local_max min_distance
+CELL_RADIUS = 5            # peak_local_max min_distance
 
 # --------------------------------------------------------------------------
 # Patch extraction (used by notebooks/04_training.ipynb, src/predict.py)

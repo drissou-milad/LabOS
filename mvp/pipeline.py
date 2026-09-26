@@ -115,18 +115,46 @@ def run_detection_and_tracking(volume, use_cnn_filter=True, config_params=None):
 
     if use_cnn_filter:
         import torch
-        from src.predict import load_model, classify_centers
+        from src.predict import (
+            load_model, collect_sample_patches, compute_sample_robust_stats,
+            classify_centers_robust,
+        )
 
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        model = load_model(config.BEST_MODEL_PATH, device)
-        stats = np.load(config.BEST_NORM_STATS_PATH)
-        mean, std = float(stats["mean"]), float(stats["std"])
+        # Pass 1: build the per-frame projections once (reused for both the sample-wide patch
+        # collection below and the per-frame classification pass) -- this was already being
+        # recomputed per frame before (projection_t = volume[t].max(axis=0) inside the old
+        # per-frame loop); computing it once up front is required now because
+        # collect_sample_patches needs every frame's projection before classification can
+        # start, not an incidental optimization.
+        projections = [volume[t].max(axis=0) for t in range(len(raw_detections))]
 
-        filtered_frames = []
-        for t, coords_t in enumerate(raw_detections):
-            projection_t = volume[t].max(axis=0)
-            kept_t, _ = classify_centers(model, projection_t, coords_t, mean, std, device)
-            filtered_frames.append(np.array(kept_t) if kept_t else np.empty((0, 2)))
+        total_candidates = sum(len(c) for c in raw_detections)
+        if total_candidates == 0:
+            # Nothing for the CNN to do -- skip model loading and sample-stats computation
+            # entirely rather than calling compute_sample_robust_stats on an empty array
+            # (which raises by design; see its docstring).
+            filtered_frames = raw_detections
+        else:
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            model = load_model(config.BEST_MODEL_PATH, device)
+
+            # Pass 2: collect + crop-resize every candidate across the WHOLE volume, compute
+            # this sample's own median/scale ONCE from that pooled population (Run13's
+            # per-sample robust normalization contract -- NOT the stored Run11 training-sample
+            # statistics under results/exp05_training_dataset/run02_20samples/
+            # run11_sample_robust_norm, and NOT models/norm_stats.npz's global mean/std, which
+            # this path no longer reads; that file is untouched on disk and still used by
+            # src/train.py and historical evaluation code).
+            sample_patches = collect_sample_patches(projections, raw_detections)
+            sample_median, sample_scale = compute_sample_robust_stats(sample_patches)
+
+            # Pass 3: classify every frame's candidates using the now-known sample-wide stats.
+            filtered_frames = []
+            for t, coords_t in enumerate(raw_detections):
+                kept_t, _ = classify_centers_robust(
+                    model, projections[t], coords_t, sample_median, sample_scale, device,
+                )
+                filtered_frames.append(np.array(kept_t) if kept_t else np.empty((0, 2)))
     else:
         filtered_frames = raw_detections
 

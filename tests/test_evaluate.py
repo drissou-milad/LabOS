@@ -230,3 +230,49 @@ def test_integration_with_lineage_builder():
 
     div_tp, div_fp, div_fn = division_confusion(pred_edges, gt_edges, nm)
     assert division_jaccard(div_tp, div_fp, div_fn) == 1.0
+
+def test_nonconsecutive_predicted_edge_is_ignored():
+    gt_nodes = [
+        {"node_id": "g0", "t": 0, "y": 0.0, "x": 0.0},
+        {"node_id": "g1", "t": 1, "y": 1.0, "x": 1.0},
+        {"node_id": "g2", "t": 2, "y": 2.0, "x": 2.0},
+    ]
+    gt_edges = [("g0", "g1"), ("g1", "g2")]
+
+    pred_nodes = [
+        {"node_id": "p0", "t": 0, "y": 0.0, "x": 0.0},
+        {"node_id": "p2", "t": 2, "y": 2.0, "x": 2.0},
+    ]
+    pred_edges = [("p0", "p2")]  # skips frame 1
+
+    nm = match_nodes(pred_nodes, gt_nodes, max_distance=1.0)
+    tp, fp, fn = edge_confusion(
+        pred_edges,
+        gt_edges,
+        nm,
+        pred_nodes=pred_nodes,
+        gt_nodes=gt_nodes,
+    )
+
+    assert (tp, fp, fn) == (0, 0, 2)
+
+
+def test_duplicate_predicted_edges_do_not_create_duplicate_tp():
+    gt_nodes, gt_edges = _gt_chain()
+
+    pred_nodes = [
+        {"node_id": "p0", "t": 0, "y": 0.0, "x": 0.0},
+        {"node_id": "p1", "t": 1, "y": 1.0, "x": 1.0},
+        {"node_id": "p2", "t": 2, "y": 2.0, "x": 2.0},
+    ]
+
+    pred_edges = [
+        ("p0", "p1"),
+        ("p0", "p1"),  # duplicate prediction
+        ("p1", "p2"),
+    ]
+
+    nm = match_nodes(pred_nodes, gt_nodes, max_distance=1.0)
+    tp, fp, fn = edge_confusion(pred_edges, gt_edges, nm)
+
+    assert (tp, fp, fn) == (2, 0, 0)

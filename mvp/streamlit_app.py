@@ -390,14 +390,13 @@ def _render_new_step3_configuration():
         )
         is_example = st.session_state.get("pending_dataset", {}).get("is_example", False)
 
-        volume = cached["volume"]
 
         thread = threading.Thread(
            target=process_job,
            args=(experiment_id, volume),
            kwargs={
                "use_cnn_filter": True,
-               "config_id": new_config_id,
+               "config_id": config_id,
           },
           daemon=True,
         )
@@ -692,7 +691,6 @@ def render_detail():
                     from src.analytics import compute_node_speeds
 
                     result = cached["result"]
-                    volume = cached["volume"]
                     pixel_size_um = config_row.get("pixel_size_um") if config_row else None
                     frame_interval_min = config_row.get("frame_interval_min") if config_row else None
                     speeds, units = compute_node_speeds(result, pixel_size_um, frame_interval_min)

@@ -137,42 +137,64 @@ def run_method(name, frames, tracker, use_lineage_builder, division_max_distance
     return nodes, edges, elapsed, mem_after - mem_before
 
 
-def score_method(pred_nodes, pred_edges, gt_nodes, gt_edges, n_true_nodes_estimate,
-                  max_distance=7.0):
+def score_method(pred_nodes, pred_edges, gt_nodes, gt_edges, n_true_nodes_estimate=None,
+                 max_distance=7.0):
     """
-    Runs src/evaluate.py's exact competition metric on one method's output, plus precision and
-    recall (both directly derived from the same tp/fp/fn the competition score already uses —
-    not a separately-invented metric) and a "node detection rate" in place of a generic
-    "accuracy," since classification-style accuracy isn't well-defined here (there's no natural
-    notion of a true negative in a sparse ground-truth tracking graph) — see this function's
-    return dict for exactly what each number means, rather than a label that invites assuming
-    more than it says.
+    Computes benchmark diagnostics.
+
+    Official adjusted CTC score requires a verified coarse estimate of the total
+    true node count (including unannotated cells). If that value is unavailable,
+    adjusted_edge_jaccard and final_score are reported as None rather than
+    producing a misleading score.
     """
     nm = match_nodes(pred_nodes, gt_nodes, max_distance=max_distance)
-    tp, fp, fn = edge_confusion(pred_edges, gt_edges, nm)
+
+    tp, fp, fn = edge_confusion(
+    pred_edges,
+    gt_edges,
+    nm,
+    pred_nodes=pred_nodes,
+    gt_nodes=gt_nodes,
+    )
     j = edge_jaccard(tp, fp, fn)
-    aej = adjusted_edge_jaccard(j, n_pred_nodes=len(pred_nodes),
-                                 n_true_nodes_estimate=n_true_nodes_estimate)
+
+    if n_true_nodes_estimate is not None and n_true_nodes_estimate > 0:
+        aej = adjusted_edge_jaccard(
+            j,
+            n_pred_nodes=len(pred_nodes),
+            n_true_nodes_estimate=n_true_nodes_estimate,
+        )
+        fs = final_score(aej, division_jaccard(*division_confusion(pred_edges, gt_edges, nm)))
+    else:
+        aej = None
+        fs = None
+
     dtp, dfp, dfn = division_confusion(pred_edges, gt_edges, nm)
     dj = division_jaccard(dtp, dfp, dfn)
 
     edge_precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
     edge_recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
 
-    # Fraction of ground-truth nodes this method's predictions matched at all — an honest stand
-    # -in for "detection accuracy" that doesn't pretend a true-negative rate exists here.
     matched_gt_node_ids = set(nm.values())
-    node_detection_rate = len(matched_gt_node_ids) / len(gt_nodes) if gt_nodes else 0.0
+    node_detection_rate = (
+        len(matched_gt_node_ids) / len(gt_nodes)
+        if gt_nodes else 0.0
+    )
 
     return {
+        "raw_edge_jaccard": j,
         "adjusted_edge_jaccard": aej,
         "division_jaccard": dj,
-        "final_score": final_score(aej, dj),
+        "final_score": fs,
         "edge_precision": edge_precision,
         "edge_recall": edge_recall,
         "node_detection_rate": node_detection_rate,
-        "edge_tp": tp, "edge_fp": fp, "edge_fn": fn,
-        "division_tp": dtp, "division_fp": dfp, "division_fn": dfn,
+        "edge_tp": tp,
+        "edge_fp": fp,
+        "edge_fn": fn,
+        "division_tp": dtp,
+        "division_fp": dfp,
+        "division_fn": dfn,
     }
 
 
@@ -222,28 +244,49 @@ def score_external_method(dataset_name, method_name, pred_nodes, pred_edges, gt_
     }
 
 
-def format_results_table(rows):
-    """Markdown table: Method, Runtime, Memory, Node Detection Rate, Precision, Recall,
-    Adjusted Edge Jaccard, Division Jaccard, and the combined Tracking Score — everything
-    needed to actually judge a method, not just one number standing alone."""
-    header = (
-        "| Dataset | Method | Runtime | Memory | Node Detection Rate | Precision | Recall | "
-        "Adjusted Edge Jaccard | Division Jaccard | Tracking Score |\n"
-    )
-    header += "|---|---|---|---|---|---|---|---|---|---|\n"
-    lines = [header]
-    for r in rows:
-        runtime_str = f"{r['runtime_seconds']:.3f}s" if r.get("runtime_seconds") is not None else "n/a"
-        memory_str = f"{r['memory_delta_mb']:+.2f} MB" if r.get("memory_delta_mb") is not None else "n/a"
-        lines.append(
-            f"| {r['dataset']} | {r['method']} | {runtime_str} | "
-            f"{memory_str} | {r['node_detection_rate']:.3f} | "
-            f"{r['edge_precision']:.3f} | {r['edge_recall']:.3f} | "
-            f"{r['adjusted_edge_jaccard']:.3f} | {r['division_jaccard']:.3f} | "
-            f"{r['final_score']:.3f} |\n"
-        )
-    return "".join(lines)
 
+def format_results_table(rows):
+        """Markdown table for benchmark diagnostics and available official metrics."""
+        header = (
+            "| Dataset | Method | Runtime | Memory | Node Detection Rate | Precision | Recall | "
+            "Raw Edge Jaccard | Adjusted Edge Jaccard | Division Jaccard | Tracking Score |\n"
+        )
+        header += "|---|---|---|---|---|---|---|---|---|---|---|\n"
+
+        lines = [header]
+
+        for r in rows:
+            runtime_str = (
+                f"{r['runtime_seconds']:.3f}s"
+                if r.get("runtime_seconds") is not None else "n/a"
+            )
+
+            memory_str = (
+                f"{r['memory_delta_mb']:+.2f} MB"
+                if r.get("memory_delta_mb") is not None else "n/a"
+            )
+            aej_str = (
+                f"{r['adjusted_edge_jaccard']:.3f}"
+                if r.get("adjusted_edge_jaccard") is not None else "N/A"
+            )
+            raw_edge_jaccard_str = (
+                f"{r['raw_edge_jaccard']:.3f}"
+                if r.get("raw_edge_jaccard") is not None else "N/A"
+            )
+            score_str = (
+                f"{r['final_score']:.3f}"
+                if r.get("final_score") is not None else "N/A"
+            )
+
+            lines.append(
+                f"| {r['dataset']} | {r['method']} | {runtime_str} | "
+                f"{memory_str} | {r['node_detection_rate']:.3f} | "
+                f"{r['edge_precision']:.3f} | {r['edge_recall']:.3f} | "
+                f"{raw_edge_jaccard_str} | {aej_str} | "
+                f"{r['division_jaccard']:.3f} | {score_str} |\n"
+            )
+
+        return "".join(lines)
 
 def plot_benchmark_dashboard(rows):
     """
@@ -251,6 +294,8 @@ def plot_benchmark_dashboard(rows):
     Precision/Recall, and Tracking Score — matching the "one page" dashboard shape rather than
     a single number standing alone. Returns the figure.
     """
+    import matplotlib
+    matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
     methods = [r["method"] for r in rows]

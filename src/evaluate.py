@@ -77,55 +77,121 @@ def match_nodes(pred_nodes, gt_nodes, max_distance=7.0):
 # Edge Jaccard
 # --------------------------------------------------------------------------
 
-def edge_confusion(pred_edges, gt_edges, node_match):
+def edge_confusion(pred_edges, gt_edges, node_match, pred_nodes=None, gt_nodes=None):
     """
-    pred_edges, gt_edges: lists of (source_id, target_id) tuples (predicted node IDs for
-    pred_edges, ground-truth node IDs for gt_edges).
-    node_match: dict pred_node_id -> gt_node_id, from match_nodes().
+    Compute edge TP/FP/FN using the CTC edge-matching rules.
 
-    Returns (tp, fp, fn) per the spec's edge-matching rule.
+    Only consecutive-frame predicted edges are evaluated.
+    Predicted edges that collapse onto the same matched GT edge are
+    counted only once.
+
+    If pred_nodes / gt_nodes are supplied, frame information is used to
+    enforce the consecutive-frame rule. For backward compatibility,
+    callers that do not supply node dictionaries fall back to evaluating
+    all edges.
     """
+    # Build node -> time lookup when node records are available.
+    pred_time = {}
+    if pred_nodes is not None:
+        pred_time = {
+            n["node_id"]: n["t"]
+            for n in pred_nodes
+        }
+
+    gt_time = {}
+    if gt_nodes is not None:
+        gt_time = {
+            n["node_id"]: n["t"]
+            for n in gt_nodes
+        }
+
+    # Official metric evaluates only consecutive-frame GT edges.
+    valid_gt_edges = set()
+    for s, t in gt_edges:
+        if gt_time:
+            if gt_time.get(t) != gt_time.get(s, -10**9) + 1:
+                continue
+        valid_gt_edges.add((s, t))
+
     gt_targets_of_source = defaultdict(set)
     gt_sources_of_target = defaultdict(set)
-    for s, t in gt_edges:
+
+    for s, t in valid_gt_edges:
         gt_targets_of_source[s].add(t)
         gt_sources_of_target[t].add(s)
 
     tp = 0
     fp = 0
     matched_gt_edges = set()
+    evaluated_pred_edges = set()
 
     for ps, pt in pred_edges:
+        # Official metric only evaluates consecutive-frame predicted edges.
+        if pred_time:
+            if pred_time.get(pt) != pred_time.get(ps, -10**9) + 1:
+                continue
+
+        # Ignore exact duplicate predicted edges.
+        pred_edge = (ps, pt)
+        if pred_edge in evaluated_pred_edges:
+            continue
+        evaluated_pred_edges.add(pred_edge)
+
         gs = node_match.get(ps)
         gtid = node_match.get(pt)
 
-        if gs is not None and gtid is not None and gtid in gt_targets_of_source.get(gs, set()):
-            tp += 1
-            matched_gt_edges.add((gs, gtid))
+        # True positive.
+        if (
+            gs is not None
+            and gtid is not None
+            and gtid in gt_targets_of_source.get(gs, set())
+        ):
+            matched_gt_edge = (gs, gtid)
+
+            # Do not count multiple predictions mapping to the same GT edge.
+            if matched_gt_edge not in matched_gt_edges:
+                tp += 1
+                matched_gt_edges.add(matched_gt_edge)
+
             continue
 
-        # FP condition (a): target matches a GT node connected to a *different* source.
-        target_is_fp = gtid is not None and len(gt_sources_of_target.get(gtid, ())) > 0 and (
-            gs is None or gtid not in gt_targets_of_source.get(gs, set())
+        # FP condition (a):
+        # target matches a GT node connected to another source.
+        target_is_fp = (
+            gtid is not None
+            and len(gt_sources_of_target.get(gtid, ())) > 0
+            and (
+                gs is None
+                or gtid not in gt_targets_of_source.get(gs, set())
+            )
         )
-        # FP condition (b): source matches a GT node connected to a *different* target.
-        source_is_fp = gs is not None and len(gt_targets_of_source.get(gs, ())) > 0 and (
-            gtid is None or gtid not in gt_targets_of_source.get(gs, set())
+
+        # FP condition (b):
+        # source matches a GT node connected to another target.
+        source_is_fp = (
+            gs is not None
+            and len(gt_targets_of_source.get(gs, ())) > 0
+            and (
+                gtid is None
+                or gtid not in gt_targets_of_source.get(gs, set())
+            )
         )
 
         if target_is_fp or source_is_fp:
             fp += 1
-        # else: both endpoints unmatched, or matched but to an unannotated region — ignored,
-        # per "predicted nodes that do not match a ground-truth node are not counted as FP."
 
-    fn = len(set(gt_edges)) - len(matched_gt_edges)
+    # Every valid GT edge not recovered by a prediction is an FN.
+    fn = len(valid_gt_edges) - len(matched_gt_edges)
+
     return tp, fp, fn
 
 
 def edge_jaccard(tp, fp, fn):
+    """
+    Compute edge Jaccard from TP, FP and FN.
+    """
     denom = tp + fp + fn
     return tp / denom if denom > 0 else 0.0
-
 
 def adjusted_edge_jaccard(jaccard, n_pred_nodes, n_true_nodes_estimate, a=0.1):
     """

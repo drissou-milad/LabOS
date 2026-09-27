@@ -42,7 +42,11 @@ from src import config
 from src.detector import CellDetector
 from src.tracker import HungarianTracker
 from src.benchmark import run_method, score_method, score_external_method, format_results_table, load_trackmate_xml
-from scripts.load_ctc_ground_truth import load_ctc_ground_truth, load_ctc_image_sequence
+from scripts.load_ctc_ground_truth import (
+    load_ctc_ground_truth,
+    load_ctc_image_sequence,
+    load_trackmate_ctc,
+)
 import mvp.experiments as experiments
 
 
@@ -95,8 +99,11 @@ def main():
         "LabOS", raw_detections, tracker, use_lineage_builder=True,
         division_max_distance=config.DIVISION_MAX_DISTANCE,
     )
-    labos_scores = score_method(labos_nodes, labos_edges, gt_nodes, gt_edges,
-                                 n_true_nodes_estimate=len(gt_nodes), max_distance=args.max_distance)
+    labos_scores = score_method(
+    labos_nodes, labos_edges, gt_nodes, gt_edges,
+    n_true_nodes_estimate=None,
+    max_distance=args.max_distance
+)
     labos_row = {"dataset": dataset_name, "method": "LabOS", "runtime_seconds": labos_elapsed,
                  "memory_delta_mb": labos_mem, **labos_scores}
 
@@ -104,11 +111,13 @@ def main():
     tm_row = None
     if args.trackmate_xml:
         print(f"Loading TrackMate export from {args.trackmate_xml}...")
-        tm_nodes, tm_edges = load_trackmate_xml(args.trackmate_xml)
+        tm_nodes, tm_edges = load_trackmate_ctc(args.trackmate_xml)
         tm_row = score_external_method(
-            dataset_name, "TrackMate", tm_nodes, tm_edges, gt_nodes, gt_edges,
-            n_true_nodes_estimate=len(gt_nodes), max_distance=args.max_distance,
-            runtime_seconds=args.trackmate_runtime_seconds, memory_delta_mb=None,
+             dataset_name, "TrackMate", tm_nodes, tm_edges, gt_nodes, gt_edges,
+             n_true_nodes_estimate=None,
+             max_distance=args.max_distance,
+             runtime_seconds=args.trackmate_runtime_seconds,
+             memory_delta_mb=None,
         )
         rows.append(tm_row)
 
@@ -118,11 +127,11 @@ def main():
     print("=" * 78)
     print(format_results_table(rows))
     print(
-        "CAVEAT: n_true_nodes_estimate is the ground-truth node count itself, which will\n"
-        "UNDERSTATE any over-prediction penalty on a sparse dataset — same caveat as\n"
-        "run_real_benchmark.py and run_trackmate_comparison.py print, applies equally to every\n"
-        "row here so it doesn't bias LabOS vs TrackMate, just the absolute numbers.\n"
-    )
+    "CAVEAT: Official adjusted CTC score is not reported because the dataset does not provide\n"
+    "a verified estimated_number_of_nodes value required by the official metric.\n"
+    "Raw edge Jaccard is reported as a diagnostic only and should not be presented as the\n"
+    "official CTC tracking score.\n"
+)
 
     if not args.skip_db:
         experiments.record_benchmark_run(

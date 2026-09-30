@@ -11,7 +11,7 @@ in a batch before a review.
 **Goal:** a researcher uploads data, gets results, downloads them — without anyone from the team
 helping.
 - [x] Detection → tracking → division detection → visualization → report, proven end-to-end on
-  a real file (`mvp/make_test_data.py` + `scripts/smoke_test.py`, see `RUNBOOK.md` step 2) —
+  a real file (`mvp/make_test_data.py` + current pipeline validation) —
   found and fixed two real bugs in the process. **CNN filtering step still unverified** (needs
   `torch` + a real environment — see `RUNBOOK.md` step 3).
 - [x] Visualization upgraded from raw red dots to colored per-track trajectories, division
@@ -35,8 +35,7 @@ helping.
   a `Method | Tracking Score | Runtime` table generator, demonstrated end-to-end on synthetic
   data. **Still a harness, not a benchmark** — see the README's Benchmark section for exactly
   what's real vs. demonstrated-on-synthetic-data here.
-- [x] Real-data benchmark script ready (`scripts/run_real_benchmark.py` +
-  `scripts/inspect_ground_truth.py`) — run `RUNBOOK.md` step 4 to get an actual number.
+- [x] Real-data benchmark workflow established (`scripts/run_ctc_benchmark.py` + `scripts/run_trackmate_comparison.py` + `scripts/load_ctc_ground_truth.py`) - current v0.7 workflow uses public CTC data and documented benchmark-v2 evidence.
 - [ ] Detection accuracy measured against ground truth on real (not synthetic) data
 - [ ] Tracking + division accuracy measured via `src/evaluate.py` on real ground truth
 - [ ] Runtime + memory usage measured for at least one realistically-sized volume

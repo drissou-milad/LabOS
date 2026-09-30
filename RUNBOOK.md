@@ -32,36 +32,11 @@ pytest -v
 execution time, and I told you as much every time I couldn't run them for real. Report back
 anything that fails.
 
-## 2. Smoke-test the MVP — no real data, no GPU needed for this part
+## 2. Historical MVP smoke test
 
-This is the one piece of "things I couldn't do" that's now actually verified, not just written:
+**None of that is the same as "tested on Windows."** Please actually run the current v0.7 benchmark and application workflows on a Windows machine before considering them verified.
 
-```bash
-python mvp/make_test_data.py
-python scripts/smoke_test.py --no-cnn
-```
-
-This should print something like:
-```
-Running detection + tracking (use_cnn_filter=False)...
-  14 nodes, 4 tracks, 1 division(s)
-...
-SMOKE TEST PASSED
-```
-
-**I ran this exact sequence myself, twice, and found two real bugs on the first pass**
-(both in the synthetic test-data generator, not the pipeline — documented with the actual
-numbers in `mvp/make_test_data.py`'s comments):
-1. The blob amplitude I picked first was below `CellDetector`'s real threshold *after* Gaussian
-   smoothing — 0 detections, silently.
-2. The division offset I picked first was smaller than the detector's own `min_distance`
-   (`config.CELL_RADIUS`), so the two daughter cells got merged into a single detected peak.
-
-Both are fixed in what's shipped, and `tests/test_mvp_pipeline.py` now asserts the shipped
-synthetic file produces at least one detected division, specifically so this can't silently
-break again. Check `mvp/test_data/smoke_test_report/report.pdf` — that's a real generated
-report from a real (synthetic) file, not a mockup.
-
+Current v0.7 validation is based on public Cell Tracking Challenge data and the benchmark workflow documented in **step 9**.
 ## 3. Run the real MVP, with the real trained model
 
 ```bash
@@ -114,82 +89,32 @@ low-risk by comparison — that part is the same proven code path as everything 
 image view automatically rather than breaking the page — but check the actual Plotly view
 works, don't just accept the fallback silently.
 
-## 5. Memory usage
+## 5. Historical memory profiling
 
-```bash
-python scripts/profile_memory.py --no-cnn
-```
+The former `scripts/profile_memory.py` workflow measured RSS on the small synthetic MVP file. The resulting measurement was dominated by fixed report-generation overhead and was not representative of real multi-GB microscopy volumes.
 
-I ran this against the shipped synthetic file (0.3 MB). Result: report generation (matplotlib
-figure/PDF overhead) used ~47 MB — over a hundred times more than the actual data. **That's not
-a useful memory estimate for a real volume** — at this tiny scale, fixed overhead dominates, so
-the number doesn't tell you how memory scales with size. Run this script directly against a
-real (multi-GB) volume before trusting any memory number for one; `detect_volume()` and
-`run_detection_and_tracking()` both hold the full volume in memory at once, so expect roughly
-linear scaling with file size, not the ~150x overhead ratio seen here.
-
+This script is retained as historical/local tooling but is not used as a v0.7 validation claim.
 ## 6. Windows compatibility
 
-I can't run anything on an actual Windows machine — this sandbox is Linux, and there's no way
-around that. What I *could* do: a static review for platform-specific bugs. Found and fixed one
-real one: `src/config.py`'s `DATASET_PATH` defaulted to a hardcoded Windows-only path
-(`D:\Datasets\...`) with no override — this would hard-fail on Linux/Mac with no clear error.
-Fixed to read `BIOHUB_DATASET_PATH` from the environment first (see `CHANGELOG.md`). Also
-checked for: `os.path` string-concatenation (none — `pathlib` used throughout), hardcoded `/`
-in path construction (none found), `os.fork`/Unix-only syscalls (none), `chmod`/symlinks (none).
+I can't run anything on an actual Windows machine - this sandbox is Linux, and there's no way around that. What I *could* do: a static review for platform-specific bugs. Found and fixed one real one: `src/config.py`'s `DATASET_PATH` defaulted to a hardcoded Windows-only path (`D:\Datasets\...`) with no override - this would hard-fail on Linux/Mac with no clear error.
+Fixed to read `BIOHUB_DATASET_PATH` from the environment first (see `CHANGELOG.md`). Also checked for: `os.path` string-concatenation (none - `pathlib` used throughout), hardcoded `/` in path construction (none found), `os.fork`/Unix-only syscalls (none), `chmod`/symlinks (none).
 
-**None of that is the same as "tested on Windows."** Please actually run this on a Windows
-machine before considering it verified — specifically: `pytest`, `streamlit run
-mvp/streamlit_app.py` end to end, and `python scripts/smoke_test.py --no-cnn`. If anything
-breaks, it's a real bug, not a formality.
+**None of that is the same as "tested on Windows."** Please actually run `pytest`, `streamlit run mvp/streamlit_app.py`, and the current v0.7 benchmark workflow on a Windows machine before considering the Windows execution path verified.
 
-## 7. Get a real benchmark number
+## 7. Real public-data validation (v0.7)
 
-```bash
-python scripts/inspect_ground_truth.py
-```
+The previous `run_real_benchmark.py` workflow is historical and is not part of the current v0.7 validation path.
 
-**Read its output before doing anything else.** It prints the actual structure of a real
-training sample's ground-truth graph. `scripts/run_real_benchmark.py`'s conversion function was
-written from partial memory of an earlier exploration, not a verified schema — if what
-`inspect_ground_truth.py` prints doesn't match what `run_real_benchmark.py` assumes (documented
-in its `load_ground_truth()` docstring), fix that function first.
+For reproducible real-data validation, use the public Cell Tracking Challenge workflow in **step 9**:
+- `scripts/load_ctc_ground_truth.py`: load CTC ground truth
+- `scripts/run_ctc_benchmark.py`: run LabOS against the public dataset
+- `scripts/run_trackmate_comparison.py`: compare LabOS with TrackMate on the same dataset
+- `scripts/benchmark_v2/`: benchmark, audit, and reproducibility tooling
 
-Then:
+## 9. Run LabOS on a real public dataset (v0.7)
 
-```bash
-python scripts/run_real_benchmark.py
-```
-
-This produces the same `Method | Tracking Score | Runtime` table as the README's synthetic
-demo, except from real data — the actual thing "priority 2" was asking for. Note the printed
-caveat about `n_true_nodes_estimate`: it's set to the ground-truth node count itself as a
-starting point, which likely understates the real over-prediction penalty if the ground truth
-is sparse. Treat the first number this prints as a reasonable first read, not a final one.
-
-## 8. TrackMate comparison (optional, needs Fiji)
-
-1. Install [Fiji](https://fiji.sc/), open your volume, run TrackMate, export the model as XML.
-2. `from src.benchmark import load_trackmate_xml; nodes, edges = load_trackmate_xml("your_export.xml")`
-3. Feed those into `src.benchmark.score_method()` alongside the other methods.
-
-`load_trackmate_xml()` is written against TrackMate's documented XML schema. `tests/test_benchmark.py`
-now checks it against a hand-authored fixture (`tests/fixtures/trackmate_sample.xml`) that follows
-that same documented schema — this proves the parser correctly implements the schema it claims to,
-including the int node-ID cast (a real class of bug: TrackMate's IDs would otherwise come back as
-strings, silently failing to match this project's own int node IDs if you ever compare the two
-directly). It does **not** prove a real Fiji export looks exactly like the fixture — TrackMate
-version differences, extra attributes, or edge cases in real data could still break it. Expect to
-debug it against your first real export; that's a one-time cost, not a recurring one.
-
-## 9. Run LabOS on a real public dataset (v0.7.0 — the one that matters most for validation)
-
-The Kaggle BioHub dataset in step 7 is real, but not public in the "anyone can download and
-verify this" sense an incubator cares about. The [Cell Tracking Challenge](https://celltrackingchallenge.net/)
-(CTC) is — it's the standard public benchmark in this exact field, and TrackMate's own authors
-use it too, so a LabOS-vs-TrackMate number on a CTC dataset is a stronger credibility claim
-than one on a private Kaggle competition dataset.
-
+The Kaggle BioHub dataset used during earlier development is real, but the current v0.7 reproducibility workflow uses a public benchmark dataset.
+The [Cell Tracking Challenge](https://celltrackingchallenge.net/) (CTC) provides public benchmark datasets for cell tracking and is the basis of the current reproducible validation workflow.
 **Pick a small dataset first** — don't start with a multi-GB one:
 - [Fluo-N2DL-HeLa](https://data.celltrackingchallenge.net/training-datasets/Fluo-N2DL-HeLa.zip)
   — 2D, HeLa cells, has divisions, moderate size. Good first choice.
@@ -223,10 +148,10 @@ whether the wiring works before committing to a full-length run. This records La
 into `labos.db`'s `benchmark_runs` table automatically; open the app and check the Performance
 page (sidebar) — your real numbers should be there. Add `--trackmate-xml
 path/to/export.xml --trackmate-runtime-seconds N` once you've also run this same sequence
-through Fiji/TrackMate (see step 11 below), to get both rows on the same Performance card.
+through Fiji/TrackMate (see step 10 below), to get both rows on the same Performance card.
 
 `scripts/load_ctc_ground_truth.py` is tested against a small hand-authored fixture
-(`tests/fixtures/ctc_sample/`), same honest caveat as `load_trackmate_xml()` in step 11: this
+(`tests/fixtures/ctc_sample/`), same honest caveat as `load_trackmate_xml()` in step 10: this
 proves the parser implements the CTC schema correctly, not that it survives every real
 dataset's quirks untested. If a specific CTC dataset trips it up, that's real signal, not a
 sign you're doing something wrong.
@@ -246,32 +171,24 @@ directly). It does **not** prove a real Fiji export looks exactly like the fixtu
 version differences, extra attributes, or edge cases in real data could still break it. Expect to
 debug it against your first real export; that's a one-time cost, not a recurring one.
 
-## 11. Priority 4 — the one thing that was never going to be code
+## 11. External researcher validation
 
-Send the message in `docs/PHASE3_VALIDATION.md` to five real people — see
-`docs/RESEARCHER_INTERVIEW_GUIDE.md` and `docs/RESEARCHER_FEEDBACK.md` for v0.7.0's more
-structured version of this same ask. There's no script for this step. It's the only item on
-this whole list that was never a "couldn't do it in the sandbox" problem — it's a "requires
-you, personally, to have a conversation" problem, and no amount of additional code changes
-that.
+Use the validation materials in `docs/PHASE3_VALIDATION.md`, `docs/RESEARCHER_INTERVIEW_GUIDE.md`, and `docs/RESEARCHER_FEEDBACK.md` to collect structured feedback from external researchers.
 
-## Summary: what's now actually verified vs. still on you
+This step is intentionally outside the codebase: it is needed to assess scientific relevance, workflow fit, and practical limitations beyond the reproducible technical validation already documented in v0.7.
 
-| | Status |
+## Summary: v0.7 validation status
+
+| Area | Status |
 |---|---|
-| 79 tests exist; 67 (everything except `test_model`/`test_dataset`/`test_seed`) pass as raw assertions | ✅ done in the sandbox |
-| All 79 tests pass via real `pytest` | ⬜ needs your machine (`torch`/`zarr` required for the other 12) |
-| Detection → tracking → division → visualization → report, on a real file | ✅ proven in the sandbox (step 2), two real bugs found and fixed |
-| Analytics (speed, per-track summary, dashboard charts) on a real file | ✅ proven in the sandbox, units verified to switch correctly with/without calibration |
-| Descendant highlighting (lineage tree + interactive viewer data layer) | ✅ proven in the sandbox against a real two-generation division |
-| Persistent multi-experiment workspace (LabOS) | ✅ registry + restart-survival logic proven in the sandbox (real module reload, not just in-memory); Streamlit rendering itself unexecuted — needs your machine |
-| Dataset gallery (`examples/`) | ✅ proven distinguishable through the real pipeline — synthetic, not real embryo data |
-| Expanded benchmark dashboard (precision/recall/memory/node detection rate) | ✅ proven in the sandbox, including scoring an external (TrackMate-style) result |
-| Scientific report structure (Experiment/Methods/Tracking Metrics/Division Analysis/Figures/Limitations/Appendix) | ✅ proven in the sandbox, both with and without a benchmark comparison embedded |
-| Interactive Plotly viewer (zoom/pan/hover) | ⬜ data layer proven, Plotly rendering itself unexecuted — needs your machine |
-| The same, with real CNN filtering (`torch`) | ⬜ needs your machine |
-| Memory usage on a real (large) volume | ⬜ profiler ready and run on synthetic data, but that run doesn't extrapolate — needs your machine + real data |
-| Windows compatibility | ⬜ one real bug found + fixed via code review (hardcoded Windows path broke Linux); not actually tested on Windows |
-| A benchmark number from real ground truth | ⬜ needs your machine + step 7 |
-| A TrackMate comparison | ⬜ parser now unit-tested against a schema-accurate fixture (step 8); still needs Fiji + a real export |
-| Five real researchers using it | ⬜ needs you, not code |
+| Public Cell Tracking Challenge benchmark workflow | [done] Established and documented |
+| CTC ground-truth loading and benchmark tooling | [done] Public/reproducible scripts committed |
+| TrackMate baseline methodology and artifacts | [done] Baseline artifacts committed; real external researcher/lab validation still pending |
+| benchmark-v2 distance-gated evaluation | [done] Established and documented |
+| Run13 held-out detector evaluation | [done] Completed with reproducible evidence package |
+| Run13 preprocessing / normalization audit | [done] Documented, including unlabeled sample-level test normalization |
+| Run13 spatial / temporal audit | [done] Targeted audits completed and documented |
+| Detector interpretation | [caution] Measurable ranking/discriminative signal; not a production operating point |
+| Biological validation | [pending] External researcher validation pending |
+| Laboratory validation | [pending] Real laboratory validation pending |
+| Production readiness | [pending] Not claimed at v0.7 |

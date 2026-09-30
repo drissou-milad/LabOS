@@ -243,11 +243,11 @@ mvp/                      # Phase 2: LabOS research workspace (dashboard → exp
     README.md
 
 scripts/
-    smoke_test.py            # headless end-to-end pipeline proof (see RUNBOOK.md)
-    profile_memory.py         # real RSS memory measurement per pipeline stage
-    inspect_ground_truth.py    # prints the real ground-truth graph schema — run before...
-    run_real_benchmark.py       # ...this, which scores src/benchmark.py against real data
-    make_gallery_examples.py     # generates examples/ (synthetic placeholders — see below)
+    run_ctc_benchmark.py          # reproducible CTC real-data benchmark
+    run_trackmate_comparison.py   # LabOS vs TrackMate comparison
+    load_ctc_ground_truth.py      # CTC ground-truth loader
+    inspect_ground_truth.py       # inspect ground-truth graph schema
+    benchmark_v2/                 # v0.7 benchmark, audit, and reproducibility tooling
 
 examples/                 # dataset gallery — SYNTHETIC placeholders, not real embryo data
     embryo_a_division_rich.tif

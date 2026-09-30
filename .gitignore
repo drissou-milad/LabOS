@@ -56,3 +56,6 @@ results/
 mvp/test_data/*.png
 mvp/test_data/*_report/
 mvp/test_data/_diagnostic_raw/
+
+# TrackMate raw baseline image/mask data
+trackmate_baseline/**/*.tif
